@@ -28,79 +28,49 @@ interface ChartDataPoint {
 }
 
 const StockChart = ({ companyId, currentDay, priceData, transactions = [] }: StockChartProps) => {
-  // Validate input data
-  if (!Array.isArray(priceData) || priceData.length === 0) {
-    return <div className="p-4 text-center">No price data available</div>;
-  }
-  
   const company = priceData.find(data => data.companyId === companyId);
-  if (!company) {
-    return <div className="p-4 text-center">No data available for this company</div>;
-  }
+  if (!company) return <div>No data available</div>;
 
   const chartData: ChartDataPoint[] = [];
   
-  // Process chart data with robust error handling
-  try {
-    // Add price data points for days up to current day - with validation
-    for (let i = 1; i <= currentDay; i++) {
-      const price = getPrice(i);
-      if (price !== null && isFinite(price) && price > 0) {
-        chartData.push({
-          name: `Day ${i}`,
-          price
-        });
+  // Add price data points for days up to current day
+  for (let i = 1; i <= currentDay; i++) {
+    const price = getPrice(i);
+    if (price !== null) {
+      chartData.push({
+        name: `Day ${i}`,
+        price
+      });
+    }
+  }
+  
+  // Add transaction markers
+  transactions
+    .filter(t => t.companyId === companyId && t.day <= currentDay)
+    .forEach(transaction => {
+      const dataPoint = chartData.find(point => point.name === `Day ${transaction.day}`);
+      if (dataPoint) {
+        if (transaction.type === 'buy') {
+          dataPoint.buys = transaction.price;
+        } else {
+          dataPoint.sells = transaction.price;
+        }
       }
-    }
-  
-    // Add transaction markers - with validation
-    if (Array.isArray(transactions) && transactions.length > 0) {
-      transactions
-        .filter(t => t && t.companyId === companyId && t.day <= currentDay)
-        .forEach(transaction => {
-          if (!transaction.price || !isFinite(transaction.price)) return;
-          
-          const dataPoint = chartData.find(point => point && point.name === `Day ${transaction.day}`);
-          if (dataPoint) {
-            if (transaction.type === 'buy') {
-              dataPoint.buys = transaction.price;
-            } else {
-              dataPoint.sells = transaction.price;
-            }
-          }
-        });
-    }
-  } catch (error) {
-    console.error("Error processing chart data:", error);
-    return <div className="p-4 text-center">Error processing chart data</div>;
-  }
+    });
 
-  // Safety check to prevent invalid array errors
-  if (chartData.length === 0) {
-    return <div className="p-4 text-center">No valid price data available for charting</div>;
-  }
-  
   function getPrice(day: number): number | null {
-    if (!company) return null;
-    
-    let price: number | undefined;
-    
     switch (day) {
-      case 1: price = company.day1Price; break;
-      case 2: price = company.day2Price; break;
-      case 3: price = company.day3Price; break;
-      case 4: price = company.day4Price; break;
-      case 5: price = company.day5Price; break;
+      case 1: return company.day1Price;
+      case 2: return company.day2Price;
+      case 3: return company.day3Price;
+      case 4: return company.day4Price;
+      case 5: return company.day5Price;
       default: return null;
     }
-    
-    return (typeof price === 'number' && isFinite(price)) ? price : null;
   }
 
-  // Calculate min and max with safety checks
-  const validPrices = chartData.map(d => d.price).filter(p => isFinite(p) && p > 0);
-  const minPrice = validPrices.length > 0 ? Math.min(...validPrices) * 0.95 : 0;
-  const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) * 1.05 : 100;
+  const minPrice = Math.min(...chartData.map(d => d.price)) * 0.95;
+  const maxPrice = Math.max(...chartData.map(d => d.price)) * 1.05;
 
   return (
     <div className="w-full h-80 bg-white rounded-lg shadow p-4">
@@ -112,14 +82,9 @@ const StockChart = ({ companyId, currentDay, priceData, transactions = [] }: Sto
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
-          <YAxis 
-            domain={[minPrice, maxPrice]} 
-            tickFormatter={(value) => `${isFinite(value) ? value.toFixed(2) : "0.00"}`}
-          />
+          <YAxis domain={[minPrice, maxPrice]} tickFormatter={(value) => `${value.toFixed(2)}`} />
           <Tooltip
-            formatter={(value: number) => {
-              return isFinite(value) ? [`AED ${value.toFixed(2)}`, 'Price'] : ['N/A', 'Price'];
-            }}
+            formatter={(value: number) => [`AED ${value.toFixed(2)}`, 'Price']}
             labelFormatter={(label) => `${label}`}
           />
           <Legend />
@@ -137,10 +102,9 @@ const StockChart = ({ companyId, currentDay, priceData, transactions = [] }: Sto
             strokeWidth={2}
             dot={{ r: 4 }}
             fill="url(#priceGradient)"
-            isAnimationActive={false}
           />
-          {Array.isArray(transactions) && transactions
-            .filter(t => t && t.companyId === companyId && t.type === 'buy' && t.day <= currentDay)
+          {transactions
+            .filter(t => t.companyId === companyId && t.type === 'buy' && t.day <= currentDay)
             .map((t, i) => (
               <ReferenceDot
                 key={`buy-${i}`}
@@ -151,8 +115,8 @@ const StockChart = ({ companyId, currentDay, priceData, transactions = [] }: Sto
                 stroke="white"
               />
             ))}
-          {Array.isArray(transactions) && transactions
-            .filter(t => t && t.companyId === companyId && t.type === 'sell' && t.day <= currentDay)
+          {transactions
+            .filter(t => t.companyId === companyId && t.type === 'sell' && t.day <= currentDay)
             .map((t, i) => (
               <ReferenceDot
                 key={`sell-${i}`}
