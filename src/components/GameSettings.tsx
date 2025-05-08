@@ -1,13 +1,15 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
 import { Company, PriceData } from '@/types/game.types';
+import { X, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface GameSettingsProps {
   isOpen: boolean;
@@ -33,10 +35,14 @@ const GameSettingsDialog = ({
   const [capital, setCapital] = useState<number>(startingCapital);
   const [difficulty, setDifficulty] = useState<string>("medium");
   const [activeTab, setActiveTab] = useState<string>("general");
+  const [newsScript, setNewsScript] = useState<string>("");
+  const [marketImpact, setMarketImpact] = useState<number>(0);
   
   // For company editing
   const [editableCompanies, setEditableCompanies] = useState<Company[]>(companies);
   const [editablePriceData, setEditablePriceData] = useState<PriceData[]>(priceData);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const difficultyToTradesMap = {
     easy: 3,
@@ -89,6 +95,56 @@ const GameSettingsDialog = ({
     setEditableCompanies(prev => prev.filter(company => company.id !== companyId));
     setEditablePriceData(prev => prev.filter(item => item.companyId !== companyId));
   };
+  
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Check if it's a CSV or Excel file
+    const fileType = file.type;
+    if (fileType !== 'text/csv' && 
+        fileType !== 'application/vnd.ms-excel' && 
+        fileType !== 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      toast.error("Please upload a CSV or Excel file");
+      return;
+    }
+    
+    // For demo purposes, we'll just show a success message
+    // In a real app, you'd parse the file and update the companies/prices
+    toast.success(`File '${file.name}' uploaded successfully. In a real implementation, this data would be processed.`);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+  
+  const applyMarketNews = () => {
+    if (!newsScript.trim()) {
+      toast.error("Please enter a news script");
+      return;
+    }
+    
+    if (marketImpact === 0) {
+      toast.error("Please set a market impact percentage");
+      return;
+    }
+    
+    // Apply the percentage change to all stock prices
+    const updatedPriceData = editablePriceData.map(item => {
+      const multiplier = 1 + (marketImpact / 100);
+      return {
+        ...item,
+        day2Price: item.day2Price * multiplier,
+        day3Price: item.day3Price * multiplier,
+        day4Price: item.day4Price * multiplier,
+        day5Price: item.day5Price * multiplier
+      };
+    });
+    
+    setEditablePriceData(updatedPriceData);
+    toast.success(`Market news applied with ${marketImpact}% impact on all future prices`);
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -125,24 +181,31 @@ const GameSettingsDialog = ({
               
               <div className="space-y-2">
                 <Label>Difficulty</Label>
-                <div className="control w-full max-w-xs mx-auto mt-2">
-                  <div className="control__track bg-muted rounded-full p-1 relative h-10">
-                    <div className="indicator absolute w-1/3 h-[calc(100%-8px)] bg-primary rounded-full transition-transform duration-300 top-1" 
-                         style={{ 
-                           transform: difficulty === "easy" ? "translateX(0%)" : 
-                                     difficulty === "medium" ? "translateX(100%)" : "translateX(200%)" 
-                         }}></div>
-                    <ToggleGroup 
-                      type="single" 
-                      value={difficulty} 
-                      onValueChange={(value) => value && setDifficulty(value)}
-                      className="grid grid-cols-3 h-full relative z-10"
-                    >
-                      <ToggleGroupItem value="easy" className="rounded-full h-full">Easy</ToggleGroupItem>
-                      <ToggleGroupItem value="medium" className="rounded-full h-full">Medium</ToggleGroupItem>
-                      <ToggleGroupItem value="hard" className="rounded-full h-full">Hard</ToggleGroupItem>
-                    </ToggleGroup>
-                  </div>
+                <div className="flex items-center justify-center gap-4 mt-2">
+                  <Button 
+                    type="button"
+                    variant={difficulty === "easy" ? "default" : "outline"}
+                    onClick={() => setDifficulty("easy")}
+                    className="flex-1"
+                  >
+                    Easy
+                  </Button>
+                  <Button 
+                    type="button"
+                    variant={difficulty === "medium" ? "default" : "outline"}
+                    onClick={() => setDifficulty("medium")}
+                    className="flex-1"
+                  >
+                    Medium
+                  </Button>
+                  <Button 
+                    type="button"
+                    variant={difficulty === "hard" ? "default" : "outline"}
+                    onClick={() => setDifficulty("hard")}
+                    className="flex-1"
+                  >
+                    Hard
+                  </Button>
                 </div>
                 <p className="text-xs text-gray-500 text-center mt-2">
                   {difficulty === "easy" ? "3 trades per day" : 
@@ -173,7 +236,65 @@ const GameSettingsDialog = ({
           
           <TabsContent value="admin" className="space-y-4">
             <Card className="p-4">
-              <h3 className="font-medium mb-4">Edit Companies & Prices</h3>
+              <h3 className="font-medium mb-2">Upload Company Data</h3>
+              <div className="flex items-center gap-4 mb-6">
+                <Input 
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  className="flex-1"
+                />
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="whitespace-nowrap"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </Button>
+              </div>
+              
+              <h3 className="font-medium mb-2">Market News</h3>
+              <div className="space-y-2 mb-6">
+                <Label htmlFor="newsScript">News Script</Label>
+                <Textarea 
+                  id="newsScript" 
+                  placeholder="Enter market news that will affect all stocks..."
+                  value={newsScript}
+                  onChange={(e) => setNewsScript(e.target.value)}
+                  rows={3}
+                  className="resize-none"
+                />
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="marketImpact">Market Impact (%)</Label>
+                    <Input 
+                      id="marketImpact" 
+                      type="number"
+                      value={marketImpact}
+                      onChange={(e) => setMarketImpact(parseFloat(e.target.value) || 0)}
+                      min="-50"
+                      max="50"
+                      step="0.5"
+                      placeholder="-50 to +50"
+                    />
+                  </div>
+                  <Button 
+                    type="button"
+                    onClick={applyMarketNews}
+                    className="mt-6"
+                  >
+                    Apply
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500">
+                  This will affect all stock prices for future days by the specified percentage.
+                </p>
+              </div>
+              
+              <h3 className="font-medium mb-2">Edit Companies & Prices</h3>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-muted">
@@ -196,7 +317,7 @@ const GameSettingsDialog = ({
                             <Input 
                               value={company.name} 
                               onChange={(e) => updateCompanyName(company.id, e.target.value)}
-                              className="w-full h-8 text-sm"
+                              className="w-full h-8 text-sm min-w-[200px]"
                             />
                           </td>
                           <td className="px-2 py-2">
