@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -75,6 +74,7 @@ const Index = () => {
     
     saveGameSettings(newSettings);
     
+    // Make sure to initialize the game with the proper tradesPerDay from settings
     const newGameState = initializeGameState(newSettings);
     
     setAppState({
@@ -84,7 +84,7 @@ const Index = () => {
     });
     
     setIsSettingsOpen(false);
-    toast.success("New game started with AED " + startingCapital.toFixed(2));
+    toast.success(`New game started with AED ${startingCapital.toFixed(2)} and ${tradesPerDay} trades per day`);
   };
   
   // Handle updating companies and price data

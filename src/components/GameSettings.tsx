@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
@@ -57,7 +56,9 @@ const GameSettingsDialog = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onStartGame(capital, difficultyToTradesMap[difficulty as keyof typeof difficultyToTradesMap]);
+    // Make sure to pass the correct trades per day based on difficulty
+    const tradesPerDay = difficultyToTradesMap[difficulty as keyof typeof difficultyToTradesMap];
+    onStartGame(capital, tradesPerDay);
     
     // If admin settings were changed, update them
     if (activeTab === "admin" && onUpdateCompanies && onUpdatePriceData) {
@@ -148,7 +149,7 @@ const GameSettingsDialog = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Game Settings</DialogTitle>
           <DialogDescription>
@@ -296,7 +297,7 @@ const GameSettingsDialog = ({
               
               <h3 className="font-medium mb-2">Edit Companies & Prices</h3>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full text-sm">
                   <thead className="bg-muted">
                     <tr>
                       <th className="px-2 py-2 text-left text-xs font-medium">Company</th>
@@ -317,7 +318,7 @@ const GameSettingsDialog = ({
                             <Input 
                               value={company.name} 
                               onChange={(e) => updateCompanyName(company.id, e.target.value)}
-                              className="w-full h-8 text-sm min-w-[200px]"
+                              className="w-full h-8 text-sm min-w-[250px]"
                             />
                           </td>
                           <td className="px-2 py-2">
