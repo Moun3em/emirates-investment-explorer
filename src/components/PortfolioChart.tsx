@@ -31,13 +31,19 @@ const PortfolioChart = ({ portfolioHistory }: PortfolioChartProps) => {
     return <div>No portfolio data available</div>;
   }
 
+  // Make sure we have valid data for our chart
   const chartData: ChartDataPoint[] = portfolioHistory.map(snapshot => ({
     name: `Day ${snapshot.day}`,
-    value: snapshot.totalValue,
-    cash: snapshot.cash,
-    stocks: snapshot.holdingsValue,
-    change: snapshot.percentChange || 0
+    value: isFinite(snapshot.totalValue) ? snapshot.totalValue : 0,
+    cash: isFinite(snapshot.cash) ? snapshot.cash : 0,
+    stocks: isFinite(snapshot.holdingsValue) ? snapshot.holdingsValue : 0,
+    change: isFinite(snapshot.percentChange || 0) ? (snapshot.percentChange || 0) : 0
   }));
+
+  // Safety check to prevent invalid array length errors
+  if (chartData.length === 0) {
+    return <div>No valid portfolio data available for charting</div>;
+  }
 
   return (
     <div className="w-full h-80 bg-white rounded-lg shadow p-4">

@@ -33,32 +33,48 @@ const StockChart = ({ companyId, currentDay, priceData, transactions = [] }: Sto
 
   const chartData: ChartDataPoint[] = [];
   
-  // Add price data points for days up to current day
-  for (let i = 1; i <= currentDay; i++) {
-    const price = getPrice(i);
-    if (price !== null) {
-      chartData.push({
-        name: `Day ${i}`,
-        price
-      });
+  // Add price data points for days up to current day - with validation
+  try {
+    for (let i = 1; i <= currentDay; i++) {
+      const price = getPrice(i);
+      if (price !== null && isFinite(price)) {
+        chartData.push({
+          name: `Day ${i}`,
+          price
+        });
+      }
     }
+  
+    // Add transaction markers - with validation
+    if (transactions && transactions.length > 0) {
+      transactions
+        .filter(t => t.companyId === companyId && t.day <= currentDay)
+        .forEach(transaction => {
+          if (!transaction.price || !isFinite(transaction.price)) return;
+          
+          const dataPoint = chartData.find(point => point.name === `Day ${transaction.day}`);
+          if (dataPoint) {
+            if (transaction.type === 'buy') {
+              dataPoint.buys = transaction.price;
+            } else {
+              dataPoint.sells = transaction.price;
+            }
+          }
+        });
+    }
+  } catch (error) {
+    console.error("Error processing chart data:", error);
+    return <div>Error processing chart data</div>;
+  }
+
+  // Safety check to prevent invalid array errors
+  if (chartData.length === 0) {
+    return <div>No valid price data available for charting</div>;
   }
   
-  // Add transaction markers
-  transactions
-    .filter(t => t.companyId === companyId && t.day <= currentDay)
-    .forEach(transaction => {
-      const dataPoint = chartData.find(point => point.name === `Day ${transaction.day}`);
-      if (dataPoint) {
-        if (transaction.type === 'buy') {
-          dataPoint.buys = transaction.price;
-        } else {
-          dataPoint.sells = transaction.price;
-        }
-      }
-    });
-
   function getPrice(day: number): number | null {
+    if (!company) return null;
+    
     switch (day) {
       case 1: return company.day1Price;
       case 2: return company.day2Price;
@@ -69,8 +85,10 @@ const StockChart = ({ companyId, currentDay, priceData, transactions = [] }: Sto
     }
   }
 
-  const minPrice = Math.min(...chartData.map(d => d.price)) * 0.95;
-  const maxPrice = Math.max(...chartData.map(d => d.price)) * 1.05;
+  // Calculate min and max with safety checks
+  const validPrices = chartData.map(d => d.price).filter(p => isFinite(p));
+  const minPrice = validPrices.length > 0 ? Math.min(...validPrices) * 0.95 : 0;
+  const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) * 1.05 : 100;
 
   return (
     <div className="w-full h-80 bg-white rounded-lg shadow p-4">
@@ -82,7 +100,10 @@ const StockChart = ({ companyId, currentDay, priceData, transactions = [] }: Sto
         >
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="name" />
-          <YAxis domain={[minPrice, maxPrice]} tickFormatter={(value) => `${value.toFixed(2)}`} />
+          <YAxis 
+            domain={[minPrice, maxPrice]} 
+            tickFormatter={(value) => `${value.toFixed(2)}`} 
+          />
           <Tooltip
             formatter={(value: number) => [`AED ${value.toFixed(2)}`, 'Price']}
             labelFormatter={(label) => `${label}`}
