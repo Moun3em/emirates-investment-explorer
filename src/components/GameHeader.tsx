@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, ChevronDown, Info, Settings } from 'lucide-react';
+import { ChevronDown, Info, Settings } from 'lucide-react';
 import { 
   Tooltip,
   TooltipContent,
@@ -58,7 +58,6 @@ const GameHeader = ({
           <Separator orientation="vertical" className="h-6 hidden md:block" />
           
           <div className="flex items-center gap-2">
-            <DollarSign className="text-gray-500 h-4 w-4" />
             <div>
               <span className="text-sm text-gray-500">Cash</span>
               <p className="font-semibold">AED {cash.toFixed(2)}</p>

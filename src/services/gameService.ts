@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 
 const GAME_STATE_KEY = 'uae_stock_game_state';
 const GAME_SETTINGS_KEY = 'uae_stock_game_settings';
+const MARKET_DATA_KEY_PREFIX = 'uae_stock_market_data_';
 
 const DEFAULT_GAME_SETTINGS: GameSettings = {
   startingCapital: 10000,
@@ -16,10 +17,21 @@ const DEFAULT_GAME_SETTINGS: GameSettings = {
 };
 
 export const initializeMarketState = (): MarketState => {
+  // Try to load saved market data from local storage first
+  const savedCompanies = localStorage.getItem(`${MARKET_DATA_KEY_PREFIX}companies`);
+  const savedPriceData = localStorage.getItem(`${MARKET_DATA_KEY_PREFIX}priceData`);
+  
+  const companies = savedCompanies ? JSON.parse(savedCompanies) : [...sampleCompanies];
+  const priceData = savedPriceData ? JSON.parse(savedPriceData) : [...samplePriceData];
+  
   return {
-    companies: [...sampleCompanies],
-    priceData: [...samplePriceData]
+    companies,
+    priceData
   };
+};
+
+export const updateMarketData = (dataType: 'companies' | 'priceData', data: any): void => {
+  localStorage.setItem(`${MARKET_DATA_KEY_PREFIX}${dataType}`, JSON.stringify(data));
 };
 
 export const initializeGameState = (settings: GameSettings): GameState => {
@@ -397,11 +409,14 @@ export const advanceToNextDay = (
   
   toast.success(`Advanced to Day ${nextDay}${isGameOver ? " - Final Day!" : ""}`);
   
+  // Use the stored tradesPerDay setting from the game settings
+  const settings = loadGameSettings();
+  
   return {
     ...gameState,
     currentDay: nextDay,
     portfolioValueHistory: [...gameState.portfolioValueHistory, newSnapshot],
-    dailyTradesRemaining: DEFAULT_GAME_SETTINGS.tradesPerDay,
+    dailyTradesRemaining: settings.tradesPerDay,
     isGameOver
   };
 };

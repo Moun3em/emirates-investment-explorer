@@ -156,7 +156,12 @@ const Market = ({
                         <Button 
                           variant="outline" 
                           size="sm"
-                          onClick={() => setShares(maxAffordableShares)}
+                          onClick={() => {
+                            // For Buy: set max affordable shares
+                            // For Sell: set max owned shares
+                            const sellMode = info.sharesOwned > 0;
+                            setShares(sellMode ? info.sharesOwned : maxAffordableShares);
+                          }}
                         >
                           Max
                         </Button>

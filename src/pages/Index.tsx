@@ -12,9 +12,10 @@ import {
   advanceToNextDay,
   buyStock,
   sellStock,
-  resetGame
+  resetGame,
+  updateMarketData
 } from "@/services/gameService";
-import { AppState, GameSettings as GameSettingsType, GameState, MarketState } from "@/types/game.types";
+import { AppState, Company, GameSettings as GameSettingsType, GameState, MarketState, PriceData } from "@/types/game.types";
 import Market from "@/components/Market";
 import Portfolio from "@/components/Portfolio";
 import Transactions from "@/components/Transactions";
@@ -65,10 +66,11 @@ const Index = () => {
   }, [appState.gameState?.isGameOver, appState.gameState?.currentDay]);
   
   // Handle starting a new game
-  const handleStartGame = (startingCapital: number) => {
+  const handleStartGame = (startingCapital: number, tradesPerDay: number) => {
     const newSettings = {
       ...appState.gameSettings,
-      startingCapital
+      startingCapital,
+      tradesPerDay
     };
     
     saveGameSettings(newSettings);
@@ -83,6 +85,37 @@ const Index = () => {
     
     setIsSettingsOpen(false);
     toast.success("New game started with AED " + startingCapital.toFixed(2));
+  };
+  
+  // Handle updating companies and price data
+  const handleUpdateCompanies = (companies: Company[]) => {
+    const updatedMarketState = {
+      ...appState.marketState,
+      companies
+    };
+    
+    setAppState(prevState => ({
+      ...prevState,
+      marketState: updatedMarketState
+    }));
+    
+    updateMarketData('companies', companies);
+    toast.success("Companies updated successfully");
+  };
+  
+  const handleUpdatePriceData = (priceData: PriceData[]) => {
+    const updatedMarketState = {
+      ...appState.marketState,
+      priceData
+    };
+    
+    setAppState(prevState => ({
+      ...prevState,
+      marketState: updatedMarketState
+    }));
+    
+    updateMarketData('priceData', priceData);
+    toast.success("Price data updated successfully");
   };
   
   // Handle advancing to next day
@@ -146,13 +179,17 @@ const Index = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center space-y-4">
-          <h1 className="text-3xl font-bold text-gray-800">UAE Stock Market Game</h1>
+          <h1 className="text-3xl font-bold text-gray-800">UAE Stock Exchange</h1>
           <p className="text-gray-600">Learn about investing in the UAE stock market!</p>
           <Button onClick={() => setIsSettingsOpen(true)}>Start Game</Button>
           <GameSettingsDialog
             isOpen={isSettingsOpen}
             onClose={() => setIsSettingsOpen(false)}
             onStartGame={handleStartGame}
+            companies={appState.marketState.companies}
+            priceData={appState.marketState.priceData}
+            onUpdateCompanies={handleUpdateCompanies}
+            onUpdatePriceData={handleUpdatePriceData}
           />
         </div>
       </div>
@@ -165,10 +202,16 @@ const Index = () => {
   const { companies, priceData } = appState.marketState;
   
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
-      <h1 className="text-3xl font-bold text-center mb-6 text-gray-800">
-        UAE Stock Market Explorer
-      </h1>
+    <div className="container mx-auto px-4 py-6 max-w-7xl flex flex-col min-h-screen">
+      <div className="flex justify-between items-center mb-6">
+        <div className="w-1/4"></div>
+        <h1 className="text-3xl font-bold text-center text-gray-800">
+          UAE Stock Exchange
+        </h1>
+        <div className="w-1/4 text-right text-sm md:text-base text-gray-600">
+          Yas School Your Next Step
+        </div>
+      </div>
       
       <GameHeader
         currentDay={currentDay}
@@ -181,7 +224,7 @@ const Index = () => {
         onResetGame={handleResetGame}
       />
       
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-grow">
         <TabsList className="grid w-full grid-cols-3 mb-8">
           <TabsTrigger value="market">Market</TabsTrigger>
           <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
@@ -217,12 +260,20 @@ const Index = () => {
         </TabsContent>
       </Tabs>
       
+      <footer className="py-4 text-center text-gray-500 mt-auto">
+        FantasiaDXB
+      </footer>
+      
       {/* Dialogs */}
       <GameSettingsDialog
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onStartGame={handleStartGame}
         startingCapital={appState.gameSettings.startingCapital}
+        companies={appState.marketState.companies}
+        priceData={appState.marketState.priceData}
+        onUpdateCompanies={handleUpdateCompanies}
+        onUpdatePriceData={handleUpdatePriceData}
       />
       
       <GameInstructions
