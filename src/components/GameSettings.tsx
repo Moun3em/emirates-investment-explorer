@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface GameSettingsProps {
   isOpen: boolean;
@@ -12,8 +13,9 @@ interface GameSettingsProps {
   startingCapital?: number;
 }
 
-const GameSettings = ({ isOpen, onClose, onStartGame, startingCapital = 10000 }: GameSettingsProps) => {
+const GameSettingsDialog = ({ isOpen, onClose, onStartGame, startingCapital = 10000 }: GameSettingsProps) => {
   const [capital, setCapital] = useState<number>(startingCapital);
+  const [difficulty, setDifficulty] = useState<string>("normal");
 
   const handleCapitalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = parseFloat(e.target.value);
@@ -50,6 +52,29 @@ const GameSettings = ({ isOpen, onClose, onStartGame, startingCapital = 10000 }:
             </p>
           </div>
           
+          <div className="space-y-2">
+            <Label>Difficulty</Label>
+            <div className="control w-full max-w-xs mx-auto mt-2">
+              <div className="control__track bg-muted rounded-full p-1 relative h-10">
+                <div className="indicator absolute w-1/3 h-[calc(100%-8px)] bg-primary rounded-full transition-transform duration-300 top-1" 
+                     style={{ 
+                       transform: difficulty === "easy" ? "translateX(0%)" : 
+                                 difficulty === "normal" ? "translateX(100%)" : "translateX(200%)" 
+                     }}></div>
+                <ToggleGroup 
+                  type="single" 
+                  value={difficulty} 
+                  onValueChange={(value) => value && setDifficulty(value)}
+                  className="grid grid-cols-3 h-full relative z-10"
+                >
+                  <ToggleGroupItem value="easy" className="rounded-full h-full">Easy</ToggleGroupItem>
+                  <ToggleGroupItem value="normal" className="rounded-full h-full">Normal</ToggleGroupItem>
+                  <ToggleGroupItem value="hard" className="rounded-full h-full">Hard</ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            </div>
+          </div>
+          
           <div className="flex flex-col space-y-2">
             <p className="text-sm font-medium">Game Rules:</p>
             <ul className="text-sm text-gray-500 list-disc list-inside space-y-1">
@@ -73,4 +98,4 @@ const GameSettings = ({ isOpen, onClose, onStartGame, startingCapital = 10000 }:
   );
 };
 
-export default GameSettings;
+export default GameSettingsDialog;

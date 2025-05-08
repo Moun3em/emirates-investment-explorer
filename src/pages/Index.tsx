@@ -14,12 +14,12 @@ import {
   sellStock,
   resetGame
 } from "@/services/gameService";
-import { AppState, GameSettings, GameState, MarketState } from "@/types/game.types";
+import { AppState, GameSettings as GameSettingsType, GameState, MarketState } from "@/types/game.types";
 import Market from "@/components/Market";
 import Portfolio from "@/components/Portfolio";
 import Transactions from "@/components/Transactions";
 import GameHeader from "@/components/GameHeader";
-import GameSettings from "@/components/GameSettings";
+import GameSettingsDialog from "@/components/GameSettings";
 import GameInstructions from "@/components/GameInstructions";
 import GameResults from "@/components/GameResults";
 import { toast } from "sonner";
@@ -149,7 +149,7 @@ const Index = () => {
           <h1 className="text-3xl font-bold text-gray-800">UAE Stock Market Game</h1>
           <p className="text-gray-600">Learn about investing in the UAE stock market!</p>
           <Button onClick={() => setIsSettingsOpen(true)}>Start Game</Button>
-          <GameSettings
+          <GameSettingsDialog
             isOpen={isSettingsOpen}
             onClose={() => setIsSettingsOpen(false)}
             onStartGame={handleStartGame}
@@ -218,7 +218,7 @@ const Index = () => {
       </Tabs>
       
       {/* Dialogs */}
-      <GameSettings
+      <GameSettingsDialog
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
         onStartGame={handleStartGame}

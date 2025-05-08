@@ -125,4 +125,18 @@
     border-width: 5px;
     border-color: #333 transparent transparent transparent;
   }
+  
+  /* Custom control styling */
+  .control {
+    @apply relative rounded-full overflow-hidden shadow-md;
+  }
+  
+  .control__track {
+    @apply flex items-center justify-between w-full h-full relative;
+  }
+  
+  .indicator {
+    @apply absolute h-full rounded-full transition-all duration-300 ease-out;
+    z-index: 1;
+  }
 }
