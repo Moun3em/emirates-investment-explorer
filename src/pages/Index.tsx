@@ -203,14 +203,12 @@ const Index = () => {
   
   return (
     <div className="container mx-auto px-4 py-6 max-w-7xl flex flex-col min-h-screen">
-      <div className="flex justify-between items-center mb-6">
-        <div className="w-1/4"></div>
+      <div className="mb-6">
+       
         <h1 className="text-3xl font-bold text-center text-gray-800">
           UAE Stock Exchange
         </h1>
-        <div className="w-1/4 text-right text-sm md:text-base text-gray-600">
-          Yas School Your Next Step
-        </div>
+        
       </div>
       
       <GameHeader

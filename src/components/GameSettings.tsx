@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import * as React from "react";
 import {
 	Dialog,
 	DialogContent,
@@ -19,7 +19,11 @@ import { toast } from "sonner";
 interface GameSettingsProps {
 	isOpen: boolean;
 	onClose: () => void;
-	onStartGame: (startingCapital: number, tradesPerDay: number) => void;
+	onStartGame: (
+		startingCapital: number,
+		tradesPerDay: number,
+		difficulty: string
+	) => void;
 	startingCapital?: number;
 	companies?: Company[];
 	priceData?: PriceData[];
@@ -45,6 +49,11 @@ interface Portfolio {
 	};
 }
 
+interface TradeDots {
+	total: number;
+	used: number;
+}
+
 const GameSettingsDialog = ({
 	isOpen,
 	onClose,
@@ -55,19 +64,19 @@ const GameSettingsDialog = ({
 	onUpdateCompanies,
 	onUpdatePriceData,
 }: GameSettingsProps) => {
-	const [capital, setCapital] = useState<number>(startingCapital);
-	const [difficulty, setDifficulty] = useState<string>("medium");
-	const [activeTab, setActiveTab] = useState<string>("general");
-	const [newsScript, setNewsScript] = useState<string>("");
-	const [marketImpact, setMarketImpact] = useState<number>(0);
+	const [capital, setCapital] = React.useState<number>(startingCapital);
+	const [difficulty, setDifficulty] = React.useState<string>("medium");
+	const [activeTab, setActiveTab] = React.useState<string>("general");
+	const [newsScript, setNewsScript] = React.useState<string>("");
+	const [marketImpact, setMarketImpact] = React.useState<number>(0);
 
 	// For company editing
 	const [editableCompanies, setEditableCompanies] =
-		useState<Company[]>(companies);
+		React.useState<Company[]>(companies);
 	const [editablePriceData, setEditablePriceData] =
-		useState<PriceData[]>(priceData);
+		React.useState<PriceData[]>(priceData);
 
-	const fileInputRef = useRef<HTMLInputElement>(null);
+	const fileInputRef = React.useRef<HTMLInputElement>(null);
 
 	const difficultyToTradesMap = {
 		easy: 3,
@@ -75,14 +84,14 @@ const GameSettingsDialog = ({
 		hard: 9,
 	};
 
-	const [portfolio, setPortfolio] = useState<Portfolio>({
+	const [portfolio, setPortfolio] = React.useState<Portfolio>({
 		cash: startingCapital,
 		holdings: {},
 	});
 
-	const [currentDay, setCurrentDay] = useState<number>(1);
+	const [currentDay, setCurrentDay] = React.useState<number>(1);
 
-	const [tradesLeft, setTradesLeft] = useState<TradeDots>({
+	const [tradesLeft, setTradesLeft] = React.useState<TradeDots>({
 		total: difficultyToTradesMap[
 			difficulty as keyof typeof difficultyToTradesMap
 		],
@@ -96,6 +105,11 @@ const GameSettingsDialog = ({
 
 	const handleDifficultyChange = (newDifficulty: string) => {
 		setDifficulty(newDifficulty);
+		setPortfolio({
+			cash: startingCapital,
+			holdings: {},
+		});
+		setCurrentDay(1);
 		setTradesLeft({
 			total: difficultyToTradesMap[
 				newDifficulty as keyof typeof difficultyToTradesMap
@@ -106,14 +120,24 @@ const GameSettingsDialog = ({
 
 	const handleSubmit = (e: React.FormEvent) => {
 		e.preventDefault();
-		onStartGame(
-			capital,
+
+		const tradesPerDay =
 			difficultyToTradesMap[
 				difficulty as keyof typeof difficultyToTradesMap
-			]
-		);
+			];
 
-		// If admin settings were changed, update them
+		setPortfolio({
+			cash: capital,
+			holdings: {},
+		});
+		setCurrentDay(1);
+		setTradesLeft({
+			total: tradesPerDay,
+			used: 0,
+		});
+
+		onStartGame(capital, tradesPerDay, difficulty);
+
 		if (activeTab === "admin" && onUpdateCompanies && onUpdatePriceData) {
 			onUpdateCompanies(editableCompanies);
 			onUpdatePriceData(editablePriceData);
@@ -158,32 +182,22 @@ const GameSettingsDialog = ({
 		);
 	};
 
-	const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-		const file = e.target.files?.[0];
-		if (!file) return;
+	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+		const file = event.target.files?.[0];
 
-		// Check if it's a CSV or Excel file
-		const fileType = file.type;
-		if (
-			fileType !== "text/csv" &&
-			fileType !== "application/vnd.ms-excel" &&
-			fileType !==
-				"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-		) {
-			toast.error("Please upload a CSV or Excel file");
+		// Check if file exists and is CSV
+		if (!file || !file.name.endsWith(".csv")) {
+			alert("Please upload a CSV file");
 			return;
 		}
 
-		// For demo purposes, we'll just show a success message
-		// In a real app, you'd parse the file and update the companies/prices
-		toast.success(
-			`File '${file.name}' uploaded successfully. In a real implementation, this data would be processed.`
-		);
-
-		// Reset file input
-		if (fileInputRef.current) {
-			fileInputRef.current.value = "";
-		}
+		const reader = new FileReader();
+		reader.onload = (e) => {
+			const text = e.target?.result as string;
+			// Parse CSV and update settings
+			// ... parsing logic here
+		};
+		reader.readAsText(file);
 	};
 
 	const applyMarketNews = () => {
@@ -224,7 +238,7 @@ const GameSettingsDialog = ({
 		const totalValue = shares * price;
 
 		// Check if it's a valid day for trading
-		if (currentDay < 1 || currentDay > 5) {
+		if (currentDay < 1 || currentDay > 6) {
 			return {
 				newPortfolio: portfolio,
 				isValid: false,
@@ -364,8 +378,39 @@ const GameSettingsDialog = ({
 				used: 0,
 			});
 			toast.success(`Advanced to Day ${currentDay + 1}`);
-		} else {
-			toast.error("Game is complete!");
+		} else if (currentDay === 5) {
+			// Advance to Day 6 (final results)
+			setCurrentDay(6);
+
+			// Optionally, reset trades left or disable further trading
+			setTradesLeft({
+				total: 0,
+				used: 0,
+			});
+
+			// Optionally, push a final snapshot to your portfolio history here
+			const finalValue = calculatePortfolioValue(
+				portfolio,
+				5,
+				editablePriceData
+			);
+			const finalCash = portfolio.cash;
+			const finalHoldings = finalValue - finalCash;
+
+			// If you have a setPortfolioHistory or similar, push the final snapshot:
+			// setPortfolioHistory(prev => [
+			//   ...prev,
+			//   {
+			//     day: 6,
+			//     totalValue: finalValue,
+			//     cash: finalCash,
+			//     holdingsValue: finalHoldings,
+			//     percentChange: ...,
+			//   }
+			// ]);
+
+			toast.success("Game completed! Here are your results for Day 6.");
+			// Show results modal or summary if needed
 		}
 	};
 
@@ -771,78 +816,6 @@ const GameSettingsDialog = ({
 						</div>
 					</TabsContent>
 				</Tabs>
-
-				<div className="space-y-4 mb-6">
-					<div className="grid grid-cols-2 gap-4">
-						<Card className="p-4">
-							<h4 className="font-medium mb-2">
-								Portfolio Summary
-							</h4>
-							<p>Cash: AED {portfolio.cash.toFixed(2)}</p>
-							<p>Current Day: {currentDay}</p>
-							<p>
-								Portfolio Value: AED{" "}
-								{calculatePortfolioValue(
-									portfolio,
-									currentDay,
-									editablePriceData
-								).toFixed(2)}
-							</p>
-							<Button
-								onClick={advanceToNextDay}
-								disabled={currentDay >= 5}
-								className="mt-2"
-							>
-								Next Day
-							</Button>
-						</Card>
-						<Card className="p-4">
-							<h4 className="font-medium mb-2">Holdings</h4>
-							{Object.entries(portfolio.holdings).map(
-								([companyId, holding]) => {
-									const company = editableCompanies.find(
-										(c) => c.id === companyId
-									);
-									const currentPrice =
-										getCurrentPrice(companyId);
-									const marketValue =
-										holding.shares * currentPrice;
-									const profitLoss =
-										marketValue -
-										holding.shares * holding.averagePrice;
-
-									return (
-										<div key={companyId} className="mb-2">
-											<p className="font-medium">
-												{company?.name}
-											</p>
-											<p>Shares: {holding.shares}</p>
-											<p>
-												Avg Price: AED{" "}
-												{holding.averagePrice.toFixed(
-													2
-												)}
-											</p>
-											<p>
-												Current Price: AED{" "}
-												{currentPrice.toFixed(2)}
-											</p>
-											<p
-												className={
-													profitLoss >= 0
-														? "text-green-500"
-														: "text-red-500"
-												}
-											>
-												P/L: AED {profitLoss.toFixed(2)}
-											</p>
-										</div>
-									);
-								}
-							)}
-						</Card>
-					</div>
-				</div>
 			</DialogContent>
 		</Dialog>
 	);
