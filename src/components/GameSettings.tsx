@@ -531,19 +531,12 @@ const GameSettingsDialog = ({
 									<Input
 										id="startingCapital"
 										type="number"
-										min="0.01"
-										step="1000"
-										value={capital}
-										onChange={(e) => {
-											const value = parseFloat(
-												e.target.value
-											);
-											setCapital(
-												isNaN(value) || value <= 0
-													? 1000
-													: value
-											);
-										}}
+										min="10000"
+										max="10000"
+										step="10000"
+										value={10000}
+										readOnly
+										disabled
 									/>
 									<p className="text-xs text-gray-500">
 										This is the amount of cash you'll start
