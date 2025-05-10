@@ -67,8 +67,14 @@ const GameSettingsDialog = ({
 	const [capital, setCapital] = React.useState<number>(startingCapital);
 	const [difficulty, setDifficulty] = React.useState<string>("medium");
 	const [activeTab, setActiveTab] = React.useState<string>("general");
-	const [newsScript, setNewsScript] = React.useState<string>("");
-	const [marketImpact, setMarketImpact] = React.useState<number>(0);
+	const [dayImpacts, setDayImpacts] = React.useState<{
+		[key: number]: number;
+	}>({
+		2: 0,
+		3: 0,
+		4: 0,
+		5: 0,
+	});
 
 	// For company editing
 	const [editableCompanies, setEditableCompanies] =
@@ -96,6 +102,15 @@ const GameSettingsDialog = ({
 			difficulty as keyof typeof difficultyToTradesMap
 		],
 		used: 0,
+	});
+
+	const [isAddCompanyModalOpen, setIsAddCompanyModalOpen] =
+		React.useState(false);
+	const [newCompany, setNewCompany] = React.useState<Partial<Company>>({
+		name: "",
+		ticker: "",
+		sector: "",
+		description: "",
 	});
 
 	const handleCapitalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,32 +215,38 @@ const GameSettingsDialog = ({
 		reader.readAsText(file);
 	};
 
-	const applyMarketNews = () => {
-		if (!newsScript.trim()) {
-			toast.error("Please enter a news script");
+	const handleDayImpactChange = (day: number, value: string) => {
+		const numValue = parseFloat(value);
+		setDayImpacts((prev) => ({
+			...prev,
+			[day]: isNaN(numValue) ? 0 : numValue,
+		}));
+	};
+
+	const applyMarketImpact = (day: number) => {
+		const impact = dayImpacts[day];
+		if (impact === 0) {
+			toast.error(`Please set a market impact percentage for Day ${day}`);
 			return;
 		}
 
-		if (marketImpact === 0) {
-			toast.error("Please set a market impact percentage");
-			return;
-		}
-
-		// Apply the percentage change to all stock prices
+		// Apply the percentage change only to prices from the specified day onwards
 		const updatedPriceData = editablePriceData.map((item) => {
-			const multiplier = 1 + marketImpact / 100;
-			return {
-				...item,
-				day2Price: item.day2Price * multiplier,
-				day3Price: item.day3Price * multiplier,
-				day4Price: item.day4Price * multiplier,
-				day5Price: item.day5Price * multiplier,
-			};
+			const multiplier = 1 + impact / 100;
+			const updatedItem = { ...item };
+
+			// Only modify prices from the specified day onwards
+			if (day <= 2) updatedItem.day2Price = item.day2Price * multiplier;
+			if (day <= 3) updatedItem.day3Price = item.day3Price * multiplier;
+			if (day <= 4) updatedItem.day4Price = item.day4Price * multiplier;
+			if (day <= 5) updatedItem.day5Price = item.day5Price * multiplier;
+
+			return updatedItem;
 		});
 
 		setEditablePriceData(updatedPriceData);
 		toast.success(
-			`Market news applied with ${marketImpact}% impact on all future prices`
+			`Market impact of ${impact}% applied from Day ${day} onwards`
 		);
 	};
 
@@ -414,127 +435,527 @@ const GameSettingsDialog = ({
 		}
 	};
 
+	const addNewCompany = () => {
+		const newCompanyId = `company-${Date.now()}`;
+		const newCompany: Company = {
+			id: newCompanyId,
+			name: "New Company",
+			ticker: "NEW",
+			sector: "General",
+			description: "Newly added company",
+		};
+		const newPriceData = {
+			companyId: newCompanyId,
+			day1Price: 0,
+			day2Price: 0,
+			day3Price: 0,
+			day4Price: 0,
+			day5Price: 0,
+		};
+
+		setEditableCompanies((prev) => [...prev, newCompany]);
+		setEditablePriceData((prev) => [...prev, newPriceData]);
+	};
+
+	const handleAddCompany = () => {
+		if (!newCompany.name || !newCompany.ticker || !newCompany.sector) {
+			toast.error("Please fill in all required fields");
+			return;
+		}
+
+		const newCompanyId = `company-${Date.now()}`;
+		const companyToAdd: Company = {
+			id: newCompanyId,
+			name: newCompany.name,
+			ticker: newCompany.ticker,
+			sector: newCompany.sector,
+			description: newCompany.description || "",
+		};
+
+		const newPriceData = {
+			companyId: newCompanyId,
+			day1Price: 0,
+			day2Price: 0,
+			day3Price: 0,
+			day4Price: 0,
+			day5Price: 0,
+		};
+
+		setEditableCompanies((prev) => [...prev, companyToAdd]);
+		setEditablePriceData((prev) => [...prev, newPriceData]);
+		setIsAddCompanyModalOpen(false);
+		setNewCompany({
+			name: "",
+			ticker: "",
+			sector: "",
+			description: "",
+		});
+		toast.success("Company added successfully");
+	};
+
 	return (
-		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className="sm:max-w-[95vw] md:max-w-[1200px] max-h-[90vh] overflow-y-auto">
-				<DialogHeader>
-					<DialogTitle>Game Settings</DialogTitle>
-					<DialogDescription>
-						Configure your game settings before starting a new game.
-					</DialogDescription>
-				</DialogHeader>
+		<>
+			<Dialog open={isOpen} onOpenChange={onClose}>
+				<DialogContent className="sm:max-w-[95vw] md:max-w-[1200px] max-h-[90vh] overflow-y-auto">
+					<DialogHeader>
+						<DialogTitle>Game Settings</DialogTitle>
+						<DialogDescription>
+							Configure your game settings before starting a new
+							game.
+						</DialogDescription>
+					</DialogHeader>
 
-				<Tabs
-					value={activeTab}
-					onValueChange={setActiveTab}
-					className="w-full"
-				>
-					<TabsList className="grid w-full grid-cols-2 mb-4">
-						<TabsTrigger value="general">Game Settings</TabsTrigger>
-						<TabsTrigger value="admin">Admin Settings</TabsTrigger>
-					</TabsList>
+					<Tabs
+						value={activeTab}
+						onValueChange={setActiveTab}
+						className="w-full"
+					>
+						<TabsList className="grid w-full grid-cols-2 mb-4">
+							<TabsTrigger value="general">
+								Game Settings
+							</TabsTrigger>
+							<TabsTrigger value="admin">
+								Admin Settings
+							</TabsTrigger>
+						</TabsList>
 
-					<TabsContent value="general" className="space-y-4">
-						<form
-							onSubmit={handleSubmit}
-							className="space-y-4 pt-4"
-						>
-							<div className="space-y-2">
-								<Label htmlFor="startingCapital">
-									Starting Capital (AED)
-								</Label>
-								<Input
-									id="startingCapital"
-									type="number"
-									min="1000"
-									step="1000"
-									value={capital}
-									onChange={handleCapitalChange}
-								/>
-								<p className="text-xs text-gray-500">
-									This is the amount of cash you'll start with
-									(minimum AED 1,000).
-								</p>
-							</div>
+						<TabsContent value="general" className="space-y-4">
+							<form
+								onSubmit={handleSubmit}
+								className="space-y-4 pt-4"
+							>
+								<div className="space-y-2">
+									<Label htmlFor="startingCapital">
+										Starting Capital (AED)
+									</Label>
+									<Input
+										id="startingCapital"
+										type="number"
+										min="0.01"
+										step="1000"
+										value={capital}
+										onChange={(e) => {
+											const value = parseFloat(
+												e.target.value
+											);
+											setCapital(
+												isNaN(value) || value <= 0
+													? 1000
+													: value
+											);
+										}}
+									/>
+									<p className="text-xs text-gray-500">
+										This is the amount of cash you'll start
+										with (minimum AED 1,000).
+									</p>
+								</div>
 
-							<div className="space-y-2">
-								<Label>Difficulty</Label>
-								<div className="flex items-center justify-center gap-4 mt-2">
+								<div className="space-y-2">
+									<Label>Difficulty</Label>
+									<div className="flex items-center justify-center gap-4 mt-2">
+										<Button
+											type="button"
+											variant={
+												difficulty === "easy"
+													? "default"
+													: "outline"
+											}
+											onClick={() =>
+												handleDifficultyChange("easy")
+											}
+											className="flex-1"
+										>
+											Easy
+										</Button>
+										<Button
+											type="button"
+											variant={
+												difficulty === "medium"
+													? "default"
+													: "outline"
+											}
+											onClick={() =>
+												handleDifficultyChange("medium")
+											}
+											className="flex-1"
+										>
+											Medium
+										</Button>
+										<Button
+											type="button"
+											variant={
+												difficulty === "hard"
+													? "default"
+													: "outline"
+											}
+											onClick={() =>
+												handleDifficultyChange("hard")
+											}
+											className="flex-1"
+										>
+											Hard
+										</Button>
+									</div>
+								</div>
+
+								<div className="flex flex-col space-y-2">
+									<p className="text-sm font-medium">
+										Game Rules:
+									</p>
+									<ul className="text-sm text-gray-500 list-disc list-inside space-y-1">
+										<li>
+											The game simulates 5 trading days in
+											the UAE stock market.
+										</li>
+										<li>
+											You can make up to{" "}
+											{
+												difficultyToTradesMap[
+													difficulty as keyof typeof difficultyToTradesMap
+												]
+											}{" "}
+											trades per day.
+										</li>
+										<li>
+											Prices change daily based on market
+											conditions.
+										</li>
+										<li>You can buy fractional shares.</li>
+										<li>
+											The goal is to maximize your
+											portfolio value by Day 5.
+										</li>
+									</ul>
+								</div>
+
+								<div className="flex justify-end space-x-2 pt-4">
 									<Button
 										type="button"
-										variant={
-											difficulty === "easy"
-												? "default"
-												: "outline"
-										}
-										onClick={() =>
-											handleDifficultyChange("easy")
-										}
-										className="flex-1"
+										variant="outline"
+										onClick={onClose}
 									>
-										Easy
+										Cancel
 									</Button>
+									<Button type="submit">Start Game</Button>
+								</div>
+							</form>
+						</TabsContent>
+
+						<TabsContent value="admin" className="space-y-4">
+							<Card className="p-4">
+								<h3 className="font-medium mb-2">
+									Upload Company Data
+								</h3>
+								<div className="flex items-center gap-4 mb-6">
+									<Input
+										type="file"
+										accept=".csv,.xlsx,.xls"
+										ref={fileInputRef}
+										onChange={handleFileUpload}
+										className="flex-1"
+									/>
 									<Button
 										type="button"
-										variant={
-											difficulty === "medium"
-												? "default"
-												: "outline"
-										}
+										variant="outline"
 										onClick={() =>
-											handleDifficultyChange("medium")
+											fileInputRef.current?.click()
 										}
-										className="flex-1"
+										className="whitespace-nowrap"
 									>
-										Medium
-									</Button>
-									<Button
-										type="button"
-										variant={
-											difficulty === "hard"
-												? "default"
-												: "outline"
-										}
-										onClick={() =>
-											handleDifficultyChange("hard")
-										}
-										className="flex-1"
-									>
-										Hard
+										<Upload className="h-4 w-4 mr-2" />
+										Upload
 									</Button>
 								</div>
-							</div>
 
-							<div className="flex flex-col space-y-2">
-								<p className="text-sm font-medium">
-									Game Rules:
-								</p>
-								<ul className="text-sm text-gray-500 list-disc list-inside space-y-1">
-									<li>
-										The game simulates 5 trading days in the
-										UAE stock market.
-									</li>
-									<li>
-										You can make up to{" "}
-										{
-											difficultyToTradesMap[
-												difficulty as keyof typeof difficultyToTradesMap
-											]
-										}{" "}
-										trades per day.
-									</li>
-									<li>
-										Prices change daily based on market
-										conditions.
-									</li>
-									<li>You can buy fractional shares.</li>
-									<li>
-										The goal is to maximize your portfolio
-										value by Day 5.
-									</li>
-								</ul>
-							</div>
+								<h3 className="font-medium mb-2">
+									Market Impact
+								</h3>
+								<div className="space-y-2 mb-6">
+									<div className="grid grid-cols-4 gap-4">
+										{[2, 3, 4, 5].map((day) => (
+											<div
+												key={day}
+												className="space-y-2"
+											>
+												<Label>
+													Day {day} Impact (%)
+												</Label>
+												<div className="flex gap-2">
+													<Input
+														type="number"
+														min="0.01"
+														value={dayImpacts[day]}
+														onChange={(e) =>
+															handleDayImpactChange(
+																day,
+																Math.max(
+																	0.01,
+																	parseFloat(
+																		e.target
+																			.value
+																	) || 0.01
+																).toString()
+															)
+														}
+														placeholder="Enter percentage"
+													/>
+													<Button
+														onClick={() =>
+															applyMarketImpact(
+																day
+															)
+														}
+														variant="secondary"
+													>
+														Apply
+													</Button>
+												</div>
+											</div>
+										))}
+									</div>
+								</div>
 
+								<h3 className="font-medium mb-2">
+									Edit Companies & Prices
+								</h3>
+								<div className="overflow-x-auto -mx-4 sm:mx-0">
+									<table className="w-full min-w-[1000px]">
+										<thead className="bg-muted">
+											<tr>
+												<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
+													Company
+												</th>
+												<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
+													Day 1
+												</th>
+												<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
+													Day 2
+												</th>
+												<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
+													Day 3
+												</th>
+												<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
+													Day 4
+												</th>
+												<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
+													Day 5
+												</th>
+												<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
+													Action
+												</th>
+												<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
+													<Button
+														onClick={() =>
+															setIsAddCompanyModalOpen(
+																true
+															)
+														}
+														variant="outline"
+														className="whitespace-nowrap"
+													>
+														Add Company
+													</Button>
+												</th>
+											</tr>
+										</thead>
+										<tbody className="divide-y divide-muted">
+											{editableCompanies.map(
+												(company) => {
+													const prices =
+														editablePriceData.find(
+															(data) =>
+																data.companyId ===
+																company.id
+														);
+													return (
+														<tr key={company.id}>
+															<td className="px-4 py-2">
+																<Input
+																	value={
+																		company.name
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateCompanyName(
+																			company.id,
+																			e
+																				.target
+																				.value
+																		)
+																	}
+																	className="w-full h-8 text-sm min-w-[200px]"
+																/>
+															</td>
+															<td className="px-4 py-2">
+																<Input
+																	type="number"
+																	min="0.01"
+																	step="0.01"
+																	value={
+																		prices?.day1Price ||
+																		0
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateCompanyPrice(
+																			company.id,
+																			1,
+																			Math.max(
+																				0.01,
+																				parseFloat(
+																					e
+																						.target
+																						.value
+																				) ||
+																					0.01
+																			)
+																		)
+																	}
+																	className="w-24 h-8 text-sm"
+																/>
+															</td>
+															<td className="px-4 py-2">
+																<Input
+																	type="number"
+																	min="0.01"
+																	step="0.01"
+																	value={
+																		prices?.day2Price ||
+																		0
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateCompanyPrice(
+																			company.id,
+																			2,
+																			Math.max(
+																				0.01,
+																				parseFloat(
+																					e
+																						.target
+																						.value
+																				) ||
+																					0.01
+																			)
+																		)
+																	}
+																	className="w-24 h-8 text-sm"
+																/>
+															</td>
+															<td className="px-4 py-2">
+																<Input
+																	type="number"
+																	min="0.01"
+																	step="0.01"
+																	value={
+																		prices?.day3Price ||
+																		0
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateCompanyPrice(
+																			company.id,
+																			3,
+																			Math.max(
+																				0.01,
+																				parseFloat(
+																					e
+																						.target
+																						.value
+																				) ||
+																					0.01
+																			)
+																		)
+																	}
+																	className="w-24 h-8 text-sm"
+																/>
+															</td>
+															<td className="px-4 py-2">
+																<Input
+																	type="number"
+																	min="0.01"
+																	step="0.01"
+																	value={
+																		prices?.day4Price ||
+																		0
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateCompanyPrice(
+																			company.id,
+																			4,
+																			Math.max(
+																				0.01,
+																				parseFloat(
+																					e
+																						.target
+																						.value
+																				) ||
+																					0.01
+																			)
+																		)
+																	}
+																	className="w-24 h-8 text-sm"
+																/>
+															</td>
+															<td className="px-4 py-2">
+																<Input
+																	type="number"
+																	min="0.01"
+																	step="0.01"
+																	value={
+																		prices?.day5Price ||
+																		0
+																	}
+																	onChange={(
+																		e
+																	) =>
+																		updateCompanyPrice(
+																			company.id,
+																			5,
+																			Math.max(
+																				0.01,
+																				parseFloat(
+																					e
+																						.target
+																						.value
+																				) ||
+																					0.01
+																			)
+																		)
+																	}
+																	className="w-24 h-8 text-sm"
+																/>
+															</td>
+															<td className="px-4 py-2">
+																<Button
+																	variant="destructive"
+																	size="sm"
+																	onClick={() =>
+																		removeCompany(
+																			company.id
+																		)
+																	}
+																	className="whitespace-nowrap"
+																>
+																	Remove
+																</Button>
+															</td>
+															<td></td>
+														</tr>
+													);
+												}
+											)}
+										</tbody>
+									</table>
+								</div>
+							</Card>
 							<div className="flex justify-end space-x-2 pt-4">
 								<Button
 									type="button"
@@ -543,281 +964,96 @@ const GameSettingsDialog = ({
 								>
 									Cancel
 								</Button>
-								<Button type="submit">Start Game</Button>
-							</div>
-						</form>
-					</TabsContent>
-
-					<TabsContent value="admin" className="space-y-4">
-						<Card className="p-4">
-							<h3 className="font-medium mb-2">
-								Upload Company Data
-							</h3>
-							<div className="flex items-center gap-4 mb-6">
-								<Input
-									type="file"
-									accept=".csv,.xlsx,.xls"
-									ref={fileInputRef}
-									onChange={handleFileUpload}
-									className="flex-1"
-								/>
-								<Button
-									type="button"
-									variant="outline"
-									onClick={() =>
-										fileInputRef.current?.click()
-									}
-									className="whitespace-nowrap"
-								>
-									<Upload className="h-4 w-4 mr-2" />
-									Upload
+								<Button onClick={handleSubmit}>
+									Save & Start Game
 								</Button>
 							</div>
-
-							<h3 className="font-medium mb-2">Market News</h3>
-							<div className="space-y-2 mb-6">
-								<Label htmlFor="newsScript">News Script</Label>
-								<Textarea
-									id="newsScript"
-									placeholder="Enter market news that will affect all stocks..."
-									value={newsScript}
-									onChange={(e) =>
-										setNewsScript(e.target.value)
-									}
-									rows={3}
-									className="resize-none"
-								/>
-								<div className="flex items-center gap-4">
-									<div className="flex-1">
-										<Label htmlFor="marketImpact">
-											Market Impact (%)
-										</Label>
-										<Input
-											id="marketImpact"
-											type="number"
-											value={marketImpact}
-											onChange={(e) =>
-												setMarketImpact(
-													parseFloat(
-														e.target.value
-													) || 0
-												)
-											}
-											min="-50"
-											max="50"
-											step="0.5"
-											placeholder="-50 to +50"
-										/>
-									</div>
-									<Button
-										type="button"
-										onClick={applyMarketNews}
-										className="mt-6"
-									>
-										Apply
-									</Button>
-								</div>
-								<p className="text-xs text-gray-500">
-									This will affect all stock prices for future
-									days by the specified percentage.
-								</p>
-							</div>
-
-							<h3 className="font-medium mb-2">
-								Edit Companies & Prices
-							</h3>
-							<div className="overflow-x-auto -mx-4 sm:mx-0">
-								<table className="w-full min-w-[1000px]">
-									<thead className="bg-muted">
-										<tr>
-											<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
-												Company
-											</th>
-											<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
-												Day 1
-											</th>
-											<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
-												Day 2
-											</th>
-											<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
-												Day 3
-											</th>
-											<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
-												Day 4
-											</th>
-											<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
-												Day 5
-											</th>
-											<th className="px-4 py-2 text-left text-xs font-medium whitespace-nowrap">
-												Action
-											</th>
-										</tr>
-									</thead>
-									<tbody className="divide-y divide-muted">
-										{editableCompanies.map((company) => {
-											const prices =
-												editablePriceData.find(
-													(data) =>
-														data.companyId ===
-														company.id
-												);
-											return (
-												<tr key={company.id}>
-													<td className="px-4 py-2">
-														<Input
-															value={company.name}
-															onChange={(e) =>
-																updateCompanyName(
-																	company.id,
-																	e.target
-																		.value
-																)
-															}
-															className="w-full h-8 text-sm min-w-[200px]"
-														/>
-													</td>
-													<td className="px-4 py-2">
-														<Input
-															type="number"
-															value={
-																prices?.day1Price ||
-																0
-															}
-															onChange={(e) =>
-																updateCompanyPrice(
-																	company.id,
-																	1,
-																	parseFloat(
-																		e.target
-																			.value
-																	) || 0
-																)
-															}
-															className="w-24 h-8 text-sm"
-															step="0.01"
-														/>
-													</td>
-													<td className="px-4 py-2">
-														<Input
-															type="number"
-															value={
-																prices?.day2Price ||
-																0
-															}
-															onChange={(e) =>
-																updateCompanyPrice(
-																	company.id,
-																	2,
-																	parseFloat(
-																		e.target
-																			.value
-																	) || 0
-																)
-															}
-															className="w-24 h-8 text-sm"
-															step="0.01"
-														/>
-													</td>
-													<td className="px-4 py-2">
-														<Input
-															type="number"
-															value={
-																prices?.day3Price ||
-																0
-															}
-															onChange={(e) =>
-																updateCompanyPrice(
-																	company.id,
-																	3,
-																	parseFloat(
-																		e.target
-																			.value
-																	) || 0
-																)
-															}
-															className="w-24 h-8 text-sm"
-															step="0.01"
-														/>
-													</td>
-													<td className="px-4 py-2">
-														<Input
-															type="number"
-															value={
-																prices?.day4Price ||
-																0
-															}
-															onChange={(e) =>
-																updateCompanyPrice(
-																	company.id,
-																	4,
-																	parseFloat(
-																		e.target
-																			.value
-																	) || 0
-																)
-															}
-															className="w-24 h-8 text-sm"
-															step="0.01"
-														/>
-													</td>
-													<td className="px-4 py-2">
-														<Input
-															type="number"
-															value={
-																prices?.day5Price ||
-																0
-															}
-															onChange={(e) =>
-																updateCompanyPrice(
-																	company.id,
-																	5,
-																	parseFloat(
-																		e.target
-																			.value
-																	) || 0
-																)
-															}
-															className="w-24 h-8 text-sm"
-															step="0.01"
-														/>
-													</td>
-													<td className="px-4 py-2">
-														<Button
-															variant="destructive"
-															size="sm"
-															onClick={() =>
-																removeCompany(
-																	company.id
-																)
-															}
-															className="whitespace-nowrap"
-														>
-															Remove
-														</Button>
-													</td>
-												</tr>
-											);
-										})}
-									</tbody>
-								</table>
-							</div>
-						</Card>
-						<div className="flex justify-end space-x-2 pt-4">
-							<Button
-								type="button"
-								variant="outline"
-								onClick={onClose}
-							>
-								Cancel
-							</Button>
-							<Button onClick={handleSubmit}>
-								Save & Start Game
-							</Button>
+						</TabsContent>
+					</Tabs>
+				</DialogContent>
+			</Dialog>
+			<Dialog
+				open={isAddCompanyModalOpen}
+				onOpenChange={setIsAddCompanyModalOpen}
+			>
+				<DialogContent className="sm:max-w-[425px]">
+					<DialogHeader>
+						<DialogTitle>Add New Company</DialogTitle>
+						<DialogDescription>
+							Fill in the details for the new company.
+						</DialogDescription>
+					</DialogHeader>
+					<div className="grid gap-4 py-4">
+						<div className="grid gap-2">
+							<Label htmlFor="name">Company Name *</Label>
+							<Input
+								id="name"
+								value={newCompany.name}
+								onChange={(e) =>
+									setNewCompany((prev) => ({
+										...prev,
+										name: e.target.value,
+									}))
+								}
+								placeholder="Enter company name"
+							/>
 						</div>
-					</TabsContent>
-				</Tabs>
-			</DialogContent>
-		</Dialog>
+						<div className="grid gap-2">
+							<Label htmlFor="ticker">Ticker Symbol *</Label>
+							<Input
+								id="ticker"
+								value={newCompany.ticker}
+								onChange={(e) =>
+									setNewCompany((prev) => ({
+										...prev,
+										ticker: e.target.value,
+									}))
+								}
+								placeholder="Enter ticker symbol"
+							/>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="sector">Sector *</Label>
+							<Input
+								id="sector"
+								value={newCompany.sector}
+								onChange={(e) =>
+									setNewCompany((prev) => ({
+										...prev,
+										sector: e.target.value,
+									}))
+								}
+								placeholder="Enter sector"
+							/>
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="description">Description</Label>
+							<Textarea
+								id="description"
+								value={newCompany.description}
+								onChange={(e) =>
+									setNewCompany((prev) => ({
+										...prev,
+										description: e.target.value,
+									}))
+								}
+								placeholder="Enter company description"
+								rows={3}
+							/>
+						</div>
+					</div>
+					<div className="flex justify-end space-x-2">
+						<Button
+							variant="outline"
+							onClick={() => setIsAddCompanyModalOpen(false)}
+						>
+							Cancel
+						</Button>
+						<Button onClick={handleAddCompany}>Add Company</Button>
+					</div>
+				</DialogContent>
+			</Dialog>
+		</>
 	);
 };
 
