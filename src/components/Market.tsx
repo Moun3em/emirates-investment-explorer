@@ -23,6 +23,8 @@ interface MarketProps {
 	onBuy: (companyId: string, shares: number) => void;
 	onSell: (companyId: string, shares: number) => void;
 	holdings: { companyId: string; shares: number }[];
+	onUpdateCompanies?: (companies: Company[]) => void;
+	onUpdatePriceData?: (priceData: PriceData[]) => void;
 }
 
 const Market = ({
@@ -34,11 +36,25 @@ const Market = ({
 	onBuy,
 	onSell,
 	holdings,
+	onUpdateCompanies,
+	onUpdatePriceData,
 }: MarketProps) => {
-	const [selectedCompany, setSelectedCompany] = useState<string>(
-		companies[0]?.id || ""
-	);
+	const [selectedCompany, setSelectedCompany] = useState<string>("");
 	const [shares, setShares] = useState<number>(1);
+
+	// Initialize selectedCompany when companies are loaded
+	React.useEffect(() => {
+		if (companies.length > 0) {
+			if (!selectedCompany || !companies.find(c => c.id === selectedCompany)) {
+				setSelectedCompany(companies[0].id);
+			}
+		}
+	}, [companies, selectedCompany]);
+
+	// Reset shares when company changes
+	React.useEffect(() => {
+		setShares(1);
+	}, [selectedCompany]);
 
 	const handleSharesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const value = parseFloat(e.target.value);
@@ -92,6 +108,9 @@ const Market = ({
 	const info = getCurrentCompanyInfo();
 	const maxAffordableShares = info ? Math.floor(cash / info.price) : 0;
 
+	if (onUpdateCompanies) onUpdateCompanies(companies);
+	if (onUpdatePriceData) onUpdatePriceData(priceData);
+
 	return (
 		<div className="space-y-4">
 			<div className="flex flex-col md:flex-row gap-4">
@@ -111,26 +130,36 @@ const Market = ({
 								Trade
 							</h3>
 
-							<div className="space-y-4 flex-grow">
-								<div className="space-y-2">
-									<label className="block text-sm">
+							<div className="space-y-8 flex-grow">
+								<div className="space-y-4 relative">
+									<label className="block text-sm font-medium">
 										Select Company
 									</label>
 									<Select
 										value={selectedCompany}
 										onValueChange={handleCompanySelect}
 									>
-										<SelectTrigger>
-											<SelectValue placeholder="Select company" />
+										<SelectTrigger className="w-full">
+											<SelectValue placeholder="Select a company to trade" />
 										</SelectTrigger>
-										<SelectContent>
+										<SelectContent 
+										side="bottom" 
+										position="popper" 
+										align="start" 
+										sideOffset={10} 
+										alignOffset={0} 
+										avoidCollisions={false}
+										className="mt-2"
+									>
 											{companies.map((company) => (
 												<SelectItem
 													key={company.id}
 													value={company.id}
 												>
-													{company.name} (
-													{company.ticker})
+													<div className="flex flex-col">
+														<span className="font-medium">{company.name}</span>
+														<span className="text-sm text-gray-500">{company.ticker}</span>
+													</div>
 												</SelectItem>
 											))}
 										</SelectContent>

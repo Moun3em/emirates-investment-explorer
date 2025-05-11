@@ -25,6 +25,7 @@ interface GameResultsProps {
 	onPlayAgain: () => void;
 	gameState: GameState;
 	marketState: MarketState;
+	onContinue?: () => void;
 }
 
 const GameResults = ({
@@ -33,6 +34,7 @@ const GameResults = ({
 	onPlayAgain,
 	gameState,
 	marketState,
+	onContinue,
 }: GameResultsProps) => {
 	if (!gameState) return null;
 
@@ -299,6 +301,11 @@ const GameResults = ({
 						</h3>
 						<PortfolioChart
 							portfolioHistory={gameState.portfolioValueHistory}
+							currentDay={gameState.currentDay}
+							setCurrentDay={() => {}}
+							difficulty="normal"
+							difficultyToTradesMap={{ normal: 3 }}
+							advanceToNextDay={() => {}}
 						/>
 					</div>
 
@@ -321,12 +328,23 @@ const GameResults = ({
 							))}
 						</ul>
 					</div>
-
-					<div className="flex justify-end space-x-2 pt-6">
-						<Button variant="outline" onClick={onClose}>
-							Review Game
-						</Button>
-						<Button onClick={onPlayAgain}>Play Again</Button>
+					<div className="flex justify-between pt-6">
+						<div className="space-x-2">
+							<Button variant="outline" onClick={onClose}>
+								Review Game
+							</Button>
+							<Button onClick={onPlayAgain}>Play Again</Button>
+						</div>
+						<div>
+							{onContinue && gameState.currentDay < 5 && (
+								<Button
+									variant="secondary"
+									onClick={onContinue}
+								>
+									Continue
+								</Button>
+							)}
+						</div>
 					</div>
 				</div>
 			</DialogContent>

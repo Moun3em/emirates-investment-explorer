@@ -12,9 +12,19 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Company, PriceData } from "@/types/game.types";
+import type { Company, PriceData } from "@/types/game.types";
 import { X, Upload } from "lucide-react";
 import { toast } from "sonner";
+
+/*
+CSV Upload Logic:
+- When a user uploads a CSV file using the Upload button, all company and price data in the app is instantly replaced with the data from the uploaded CSV file.
+- The changes are reflected automatically in:
+  1. The Edit Companies and Prices table (admin/settings)
+  2. The Home dashboard, including the Select Company dropdown and any other place where company data is shown
+- The update is immediate and seamless: all relevant tables, dropdowns, and displays show the new data from the CSV without requiring a page reload or any API call.
+- The CSV is parsed and the app's state is updated on the client side only.
+*/
 
 interface GameSettingsProps {
 	isOpen: boolean;
@@ -68,12 +78,12 @@ const GameSettingsDialog = ({
 	const [difficulty, setDifficulty] = React.useState<string>("medium");
 	const [activeTab, setActiveTab] = React.useState<string>("general");
 	const [dayImpacts, setDayImpacts] = React.useState<{
-		[key: number]: number;
+		[key: number]: number | "";
 	}>({
-		2: 0,
-		3: 0,
-		4: 0,
-		5: 0,
+		2: "",
+		3: "",
+		4: "",
+		5: "",
 	});
 
 	// For company editing
@@ -170,22 +180,57 @@ const GameSettingsDialog = ({
 	const updateCompanyPrice = (
 		companyId: string,
 		day: number,
-		price: number
+		value: string
 	) => {
-		setEditablePriceData((prev) =>
-			prev.map((item) => {
-				if (item.companyId === companyId) {
-					const updatedItem = { ...item };
-					if (day === 1) updatedItem.day1Price = price;
-					else if (day === 2) updatedItem.day2Price = price;
-					else if (day === 3) updatedItem.day3Price = price;
-					else if (day === 4) updatedItem.day4Price = price;
-					else if (day === 5) updatedItem.day5Price = price;
-					return updatedItem;
-				}
-				return item;
-			})
-		);
+		// Allow empty string
+		if (value === "") {
+			setEditablePriceData((prev) =>
+				prev.map((item) => {
+					if (item.companyId === companyId) {
+						const updatedItem = { ...item };
+						if (day === 1) updatedItem.day1Price = "";
+						else if (day === 2) updatedItem.day2Price = "";
+						else if (day === 3) updatedItem.day3Price = "";
+						else if (day === 4) updatedItem.day4Price = "";
+						else if (day === 5) updatedItem.day5Price = "";
+						return updatedItem;
+					}
+					return item;
+				})
+			);
+			return;
+		}
+
+		// Only allow numbers and decimal point
+		if (!/^\d*\.?\d*$/.test(value)) {
+			return;
+		}
+
+		// Parse the value and ensure it's not negative
+		const numValue = parseFloat(value);
+		if (!isNaN(numValue)) {
+			// Only update if the value is non-negative
+			if (numValue >= 0) {
+				setEditablePriceData((prev) =>
+					prev.map((item) => {
+						if (item.companyId === companyId) {
+							const updatedItem = { ...item };
+							if (day === 1) updatedItem.day1Price = numValue;
+							else if (day === 2)
+								updatedItem.day2Price = numValue;
+							else if (day === 3)
+								updatedItem.day3Price = numValue;
+							else if (day === 4)
+								updatedItem.day4Price = numValue;
+							else if (day === 5)
+								updatedItem.day5Price = numValue;
+							return updatedItem;
+						}
+						return item;
+					})
+				);
+			}
+		}
 	};
 
 	const removeCompany = (companyId: string) => {
@@ -199,47 +244,136 @@ const GameSettingsDialog = ({
 
 	const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
 		const file = event.target.files?.[0];
-
-		// Check if file exists and is CSV
 		if (!file || !file.name.endsWith(".csv")) {
-			alert("Please upload a CSV file");
+			toast.error("Please upload a CSV file");
 			return;
 		}
 
 		const reader = new FileReader();
 		reader.onload = (e) => {
 			const text = e.target?.result as string;
-			// Parse CSV and update settings
-			// ... parsing logic here
+			const rows = text.split(/\r?\n/).filter(Boolean);
+			if (rows.length < 2) {
+				toast.error("CSV file is empty or invalid");
+				return;
+			}
+
+			const headers = rows[0].split(/,\s*/).map(h => h.trim());
+		
+			// Find column indices based on exact header names
+			const nameIdx = headers.findIndex(h => h === "Company Name");
+			const tickerIdx = headers.findIndex(h => h === "Ticker Symbol");
+			const sectorIdx = headers.findIndex(h => h === "Sector");
+			const descriptionIdx = headers.findIndex(h => h === "Description");
+			const day1Idx = headers.findIndex(h => h === "Day 1");
+			const day2Idx = headers.findIndex(h => h === "Day 2");
+			const day3Idx = headers.findIndex(h => h === "Day 3");
+			const day4Idx = headers.findIndex(h => h === "Day 4");
+			const day5Idx = headers.findIndex(h => h === "Day 5");
+
+			// Validate required columns
+			if (nameIdx === -1 || tickerIdx === -1 || day1Idx === -1 || day2Idx === -1 || day3Idx === -1 || day4Idx === -1 || day5Idx === -1) {
+				toast.error("CSV file must contain Company Name, Ticker Symbol, and Day 1-5 columns");
+				return;
+			}
+
+			const companies: Company[] = [];
+			const priceData: PriceData[] = [];
+
+			for (let i = 1; i < rows.length; i++) {
+				const cols = rows[i].split(/,\s*/).map(col => col.trim());
+				if (cols.length < headers.length) continue;
+
+				const companyName = cols[nameIdx];
+				const ticker = cols[tickerIdx];
+				const sector = cols[sectorIdx] || "";
+				const description = cols[descriptionIdx] || "";
+
+				if (!companyName || !ticker) continue;
+
+				companies.push({
+					id: ticker, // Use ticker as the unique identifier
+					name: companyName,
+					ticker: ticker,
+					sector: sector,
+					description: description,
+				});
+
+				priceData.push({
+					companyId: ticker,
+					day1Price: parseFloat(cols[day1Idx]) || 0,
+					day2Price: parseFloat(cols[day2Idx]) || 0,
+					day3Price: parseFloat(cols[day3Idx]) || 0,
+					day4Price: parseFloat(cols[day4Idx]) || 0,
+					day5Price: parseFloat(cols[day5Idx]) || 0,
+				});
+			}
+
+			if (companies.length === 0) {
+				toast.error("No valid company data found in CSV");
+				return;
+			}
+
+			// Update state
+			setEditableCompanies(companies);
+			setEditablePriceData(priceData);
+
+			// Update parent components
+			if (onUpdateCompanies) onUpdateCompanies(companies);
+			if (onUpdatePriceData) onUpdatePriceData(priceData);
+
+			// Reset file input
+			if (fileInputRef.current) {
+				fileInputRef.current.value = "";
+			}
+
+			toast.success(`Successfully loaded ${companies.length} companies from CSV`);
 		};
+
 		reader.readAsText(file);
 	};
 
 	const handleDayImpactChange = (day: number, value: string) => {
+		// Allow empty string
+		if (value === "") {
+			setDayImpacts((prev) => ({
+				...prev,
+				[day]: "",
+			}));
+			return;
+		}
+
+		// Allow negative numbers and decimal points
 		const numValue = parseFloat(value);
-		setDayImpacts((prev) => ({
-			...prev,
-			[day]: isNaN(numValue) ? 0 : numValue,
-		}));
+		if (!isNaN(numValue)) {
+			setDayImpacts((prev) => ({
+				...prev,
+				[day]: numValue,
+			}));
+		}
 	};
 
 	const applyMarketImpact = (day: number) => {
 		const impact = dayImpacts[day];
-		if (impact === 0) {
+		if (impact === "") {
 			toast.error(`Please set a market impact percentage for Day ${day}`);
 			return;
 		}
 
 		// Apply the percentage change only to prices from the specified day onwards
 		const updatedPriceData = editablePriceData.map((item) => {
-			const multiplier = 1 + impact / 100;
+			const multiplier = 1 + Number(impact) / 100;
 			const updatedItem = { ...item };
 
 			// Only modify prices from the specified day onwards
-			if (day <= 2) updatedItem.day2Price = item.day2Price * multiplier;
-			if (day <= 3) updatedItem.day3Price = item.day3Price * multiplier;
-			if (day <= 4) updatedItem.day4Price = item.day4Price * multiplier;
-			if (day <= 5) updatedItem.day5Price = item.day5Price * multiplier;
+			if (day <= 2 && typeof item.day2Price === "number")
+				updatedItem.day2Price = item.day2Price * multiplier;
+			if (day <= 3 && typeof item.day3Price === "number")
+				updatedItem.day3Price = item.day3Price * multiplier;
+			if (day <= 4 && typeof item.day4Price === "number")
+				updatedItem.day4Price = item.day4Price * multiplier;
+			if (day <= 5 && typeof item.day5Price === "number")
+				updatedItem.day5Price = item.day5Price * multiplier;
 
 			return updatedItem;
 		});
@@ -472,7 +606,7 @@ const GameSettingsDialog = ({
 			description: newCompany.description || "",
 		};
 
-		const newPriceData = {
+		const newPriceData: PriceData = {
 			companyId: newCompanyId,
 			day1Price: 0,
 			day2Price: 0,
@@ -677,21 +811,14 @@ const GameSettingsDialog = ({
 												<div className="flex gap-2">
 													<Input
 														type="number"
-														min="0.01"
 														value={dayImpacts[day]}
 														onChange={(e) =>
 															handleDayImpactChange(
 																day,
-																Math.max(
-																	0.01,
-																	parseFloat(
-																		e.target
-																			.value
-																	) || 0.01
-																).toString()
+																e.target.value
 															)
 														}
-														placeholder="Enter percentage"
+														placeholder="Enter %"
 													/>
 													<Button
 														onClick={() =>
@@ -783,147 +910,192 @@ const GameSettingsDialog = ({
 															</td>
 															<td className="px-4 py-2">
 																<Input
-																	type="number"
-																	min="0.01"
-																	step="0.01"
+																	type="text"
+																	inputMode="decimal"
+																	pattern="[0-9]*\.?[0-9]*"
 																	value={
-																		prices?.day1Price ||
+																		prices?.day1Price ===
 																		0
+																			? ""
+																			: prices?.day1Price ||
+																			  ""
 																	}
 																	onChange={(
 																		e
-																	) =>
-																		updateCompanyPrice(
-																			company.id,
-																			1,
-																			Math.max(
-																				0.01,
-																				parseFloat(
-																					e
-																						.target
-																						.value
-																				) ||
-																					0.01
+																	) => {
+																		const value =
+																			e
+																				.target
+																				.value;
+																		// Only allow numbers and decimal point
+																		if (
+																			value ===
+																				"" ||
+																			/^\d*\.?\d*$/.test(
+																				value
 																			)
-																		)
-																	}
+																		) {
+																			updateCompanyPrice(
+																				company.id,
+																				1,
+																				value
+																			);
+																		}
+																	}}
 																	className="w-24 h-8 text-sm"
+																	placeholder="0"
 																/>
 															</td>
 															<td className="px-4 py-2">
 																<Input
-																	type="number"
-																	min="0.01"
-																	step="0.01"
+																	type="text"
+																	inputMode="decimal"
+																	pattern="[0-9]*\.?[0-9]*"
 																	value={
-																		prices?.day2Price ||
+																		prices?.day2Price ===
 																		0
+																			? ""
+																			: prices?.day2Price ||
+																			  ""
 																	}
 																	onChange={(
 																		e
-																	) =>
-																		updateCompanyPrice(
-																			company.id,
-																			2,
-																			Math.max(
-																				0.01,
-																				parseFloat(
-																					e
-																						.target
-																						.value
-																				) ||
-																					0.01
+																	) => {
+																		const value =
+																			e
+																				.target
+																				.value;
+																		// Only allow numbers and decimal point
+																		if (
+																			value ===
+																				"" ||
+																			/^\d*\.?\d*$/.test(
+																				value
 																			)
-																		)
-																	}
+																		) {
+																			updateCompanyPrice(
+																				company.id,
+																				2,
+																				value
+																			);
+																		}
+																	}}
 																	className="w-24 h-8 text-sm"
+																	placeholder="0"
 																/>
 															</td>
 															<td className="px-4 py-2">
 																<Input
-																	type="number"
-																	min="0.01"
-																	step="0.01"
+																	type="text"
+																	inputMode="decimal"
+																	pattern="[0-9]*\.?[0-9]*"
 																	value={
-																		prices?.day3Price ||
+																		prices?.day3Price ===
 																		0
+																			? ""
+																			: prices?.day3Price ||
+																			  ""
 																	}
 																	onChange={(
 																		e
-																	) =>
-																		updateCompanyPrice(
-																			company.id,
-																			3,
-																			Math.max(
-																				0.01,
-																				parseFloat(
-																					e
-																						.target
-																						.value
-																				) ||
-																					0.01
+																	) => {
+																		const value =
+																			e
+																				.target
+																				.value;
+																		// Only allow numbers and decimal point
+																		if (
+																			value ===
+																				"" ||
+																			/^\d*\.?\d*$/.test(
+																				value
 																			)
-																		)
-																	}
+																		) {
+																			updateCompanyPrice(
+																				company.id,
+																				3,
+																				value
+																			);
+																		}
+																	}}
 																	className="w-24 h-8 text-sm"
+																	placeholder="0"
 																/>
 															</td>
 															<td className="px-4 py-2">
 																<Input
-																	type="number"
-																	min="0.01"
-																	step="0.01"
+																	type="text"
+																	inputMode="decimal"
+																	pattern="[0-9]*\.?[0-9]*"
 																	value={
-																		prices?.day4Price ||
+																		prices?.day4Price ===
 																		0
+																			? ""
+																			: prices?.day4Price ||
+																			  ""
 																	}
 																	onChange={(
 																		e
-																	) =>
-																		updateCompanyPrice(
-																			company.id,
-																			4,
-																			Math.max(
-																				0.01,
-																				parseFloat(
-																					e
-																						.target
-																						.value
-																				) ||
-																					0.01
+																	) => {
+																		const value =
+																			e
+																				.target
+																				.value;
+																		// Only allow numbers and decimal point
+																		if (
+																			value ===
+																				"" ||
+																			/^\d*\.?\d*$/.test(
+																				value
 																			)
-																		)
-																	}
+																		) {
+																			updateCompanyPrice(
+																				company.id,
+																				4,
+																				value
+																			);
+																		}
+																	}}
 																	className="w-24 h-8 text-sm"
+																	placeholder="0"
 																/>
 															</td>
 															<td className="px-4 py-2">
 																<Input
-																	type="number"
-																	min="0.01"
-																	step="0.01"
+																	type="text"
+																	inputMode="decimal"
+																	pattern="[0-9]*\.?[0-9]*"
 																	value={
-																		prices?.day5Price ||
+																		prices?.day5Price ===
 																		0
+																			? ""
+																			: prices?.day5Price ||
+																			  ""
 																	}
 																	onChange={(
 																		e
-																	) =>
-																		updateCompanyPrice(
-																			company.id,
-																			5,
-																			Math.max(
-																				0.01,
-																				parseFloat(
-																					e
-																						.target
-																						.value
-																				) ||
-																					0.01
+																	) => {
+																		const value =
+																			e
+																				.target
+																				.value;
+																		// Only allow numbers and decimal point
+																		if (
+																			value ===
+																				"" ||
+																			/^\d*\.?\d*$/.test(
+																				value
 																			)
-																		)
-																	}
+																		) {
+																			updateCompanyPrice(
+																				company.id,
+																				5,
+																				value
+																			);
+																		}
+																	}}
 																	className="w-24 h-8 text-sm"
+																	placeholder="0"
 																/>
 															</td>
 															<td className="px-4 py-2">

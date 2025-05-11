@@ -35,7 +35,7 @@ interface ChartDataPoint {
 
 const PortfolioChart = ({
 	portfolioHistory,
-	currentDay,
+	currentDay: propCurrentDay,
 	setCurrentDay,
 	difficulty,
 	difficultyToTradesMap,
@@ -77,10 +77,20 @@ const PortfolioChart = ({
 		});
 	}, [difficultyToTradesMap, difficulty]);
 
+	// Fallback for currentDay
+	const currentDay =
+		typeof propCurrentDay === "number" && !isNaN(propCurrentDay)
+			? propCurrentDay
+			: portfolioHistory[portfolioHistory.length - 1]?.day || 1;
+
 	return (
 		<div className="w-full h-80 bg-white rounded-lg shadow p-4">
-			<h3 className="text-lg font-semibold mb-4">Portfolio Value</h3>
-			<div className="mb-2 text-md font-medium">Day {currentDay}/6</div>
+			<div className="mb-2 text-xl font-bold text-center text-game-purple">
+				Day {currentDay}/5
+			</div>
+			<h3 className="text-lg font-semibold mb-4 text-center">
+				Portfolio Value
+			</h3>
 			<ResponsiveContainer width="100%" height="85%">
 				<AreaChart
 					data={chartData}
@@ -180,7 +190,7 @@ const PortfolioChart = ({
 					/>
 				</AreaChart>
 			</ResponsiveContainer>
-		
+
 			{currentDay >= 6 && (
 				<div>
 					<h2>Game Over! Here are your results.</h2>
