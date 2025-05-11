@@ -75,7 +75,7 @@ const GameSettingsDialog = ({
 	onUpdatePriceData,
 }: GameSettingsProps) => {
 	const [capital, setCapital] = React.useState<number>(startingCapital);
-	const [difficulty, setDifficulty] = React.useState<string>("medium");
+	const [difficulty, setDifficulty] = React.useState<string>("easy");
 	const [activeTab, setActiveTab] = React.useState<string>("general");
 	const [dayImpacts, setDayImpacts] = React.useState<{
 		[key: number]: number | "";
