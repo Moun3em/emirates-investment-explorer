@@ -454,6 +454,30 @@ export const sellStock = (
 	};
 };
 
+export const returnToPreviousDay = (
+	gameState: GameState
+): GameState => {
+	if (gameState.currentDay <= 1) {
+		return gameState;
+	}
+
+	const previousDay = gameState.currentDay - 1;
+	
+	// Remove the last portfolio snapshot
+	const updatedHistory = gameState.portfolioValueHistory.slice(0, -1);
+
+	// Use the stored tradesPerDay setting from the game settings
+	const settings = loadGameSettings();
+
+	return {
+		...gameState,
+		currentDay: previousDay,
+		portfolioValueHistory: updatedHistory,
+		dailyTradesRemaining: settings.tradesPerDay,
+		isGameOver: false, // Reset game over state when returning to previous day
+	};
+};
+
 export const advanceToNextDay = (
 	gameState: GameState,
 	marketState: MarketState

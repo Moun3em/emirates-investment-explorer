@@ -9,6 +9,7 @@ import {
 	saveGameSettings,
 	saveGameState,
 	advanceToNextDay,
+	returnToPreviousDay,
 	buyStock,
 	sellStock,
 	resetGame,
@@ -138,6 +139,18 @@ const Index = () => {
 			appState.gameState,
 			appState.marketState
 		);
+
+		setAppState((prevState) => ({
+			...prevState,
+			gameState: updatedGameState,
+		}));
+	};
+
+	// Handle going back to previous day
+	const handlePreviousDay = () => {
+		if (!appState.gameState) return;
+
+		const updatedGameState = returnToPreviousDay(appState.gameState);
 
 		setAppState((prevState) => ({
 			...prevState,
@@ -288,6 +301,7 @@ const Index = () => {
 				tradesRemaining={dailyTradesRemaining}
 				isGameOver={isGameOver}
 				onAdvanceDay={handleAdvanceDay}
+				onPreviousDay={handlePreviousDay}
 				onShowHelp={() => setIsInstructionsOpen(true)}
 				onResetGame={handleResetGame}
 				onShowResults={() => setIsResultsOpen(true)}

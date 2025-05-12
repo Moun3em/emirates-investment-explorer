@@ -18,6 +18,7 @@ interface GameHeaderProps {
 	tradesRemaining: number;
 	isGameOver: boolean;
 	onAdvanceDay: () => void;
+	onPreviousDay: () => void;
 	onShowHelp: () => void;
 	onResetGame: () => void;
 	onShowResults: () => void;
@@ -30,6 +31,7 @@ const GameHeader = ({
 	tradesRemaining,
 	isGameOver,
 	onAdvanceDay,
+	onPreviousDay,
 	onShowHelp,
 	onResetGame,
 	onShowResults,
@@ -56,6 +58,13 @@ const GameHeader = ({
 		onResetGame();
 		setIsResetDialogOpen(false);
 		toast.success("Game has been reset");
+	};
+
+	const returnToPreviousDay = () => {
+		if (currentDay > 1) {
+			onPreviousDay();
+			toast.success(`Returned to Day ${currentDay - 1}`);
+		}
 	};
 
 	const maxTrades = Math.max(tradesRemaining, 3);
@@ -155,6 +164,14 @@ const GameHeader = ({
 							disabled={isGameOver}
 						>
 							Stop Game
+						</Button>
+						<Button
+							variant="outline"
+							className="flex-1 md:flex-none"
+							onClick={returnToPreviousDay}
+							disabled={currentDay <= 1}
+						>
+							Return
 						</Button>
 						<Button
 							className="flex-1 md:flex-none"
