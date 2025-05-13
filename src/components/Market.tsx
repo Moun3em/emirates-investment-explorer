@@ -27,7 +27,7 @@ interface MarketProps {
 	onUpdatePriceData?: (priceData: PriceData[]) => void;
 }
 
-const Market = ({
+const Market: React.FC<MarketProps> = ({
 	companies,
 	priceData,
 	currentDay,
@@ -38,14 +38,14 @@ const Market = ({
 	holdings,
 	onUpdateCompanies,
 	onUpdatePriceData,
-}: MarketProps) => {
+}) => {
 	const [selectedCompany, setSelectedCompany] = useState<string>("");
-	const [shares, setShares] = useState<number>(1);
+	const [shares, setShares] = useState<number | null>(null);
 
 	// Initialize selectedCompany when companies are loaded
 	React.useEffect(() => {
 		if (companies.length > 0) {
-			if (!selectedCompany || !companies.find(c => c.id === selectedCompany)) {
+			if (!selectedCompany || !companies.find((c) => c.id === selectedCompany)) {
 				setSelectedCompany(companies[0].id);
 			}
 		}
@@ -53,12 +53,18 @@ const Market = ({
 
 	// Reset shares when company changes
 	React.useEffect(() => {
-		setShares(1);
+		setShares(null);
 	}, [selectedCompany]);
 
 	const handleSharesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+		if (e.target.value === '') {
+			setShares(null);
+			return;
+		}
 		const value = parseFloat(e.target.value);
-		setShares(isNaN(value) || value <= 0 ? 1 : value);
+		if (!isNaN(value) && value >= 0) {
+			setShares(value);
+		}
 	};
 
 	const handleCompanySelect = (value: string) => {
@@ -100,7 +106,7 @@ const Market = ({
 
 		const price = getStockPrice(company.id, currentDay, priceData) || 0;
 		const sharesOwned = getSharesOwned(company.id);
-		const totalCost = price * shares;
+		const totalCost = price * (shares ?? 0);
 
 		return { company, price, sharesOwned, totalCost };
 	};
@@ -142,23 +148,27 @@ const Market = ({
 										<SelectTrigger className="w-full">
 											<SelectValue placeholder="Select a company to trade" />
 										</SelectTrigger>
-										<SelectContent 
-										side="bottom" 
-										position="popper" 
-										align="start" 
-										sideOffset={10} 
-										alignOffset={0} 
-										avoidCollisions={false}
-										className="mt-2"
-									>
+										<SelectContent
+											side="bottom"
+											position="popper"
+											align="start"
+											sideOffset={10}
+											alignOffset={0}
+											avoidCollisions={false}
+											className="mt-2"
+										>
 											{companies.map((company) => (
 												<SelectItem
 													key={company.id}
 													value={company.id}
 												>
 													<div className="flex flex-col">
-														<span className="font-medium">{company.name}</span>
-														<span className="text-sm text-gray-500">{company.ticker}</span>
+														<span className="font-medium">
+															{company.name}
+														</span>
+														<span className="text-sm text-gray-500">
+															{company.ticker}
+														</span>
 													</div>
 												</SelectItem>
 											))}
@@ -192,10 +202,10 @@ const Market = ({
 											</label>
 											<Input
 												type="number"
-												min="0.01"
-												step="0.01"
-												value={shares}
+												value={shares ?? ""}
 												onChange={handleSharesChange}
+												min={0}
+												placeholder="Enter amount"
 											/>
 											<div className="flex gap-2">
 												<Button
@@ -218,7 +228,7 @@ const Market = ({
 															? info.sharesOwned
 															: maxAffordableShares;
 														setShares(
-															max > 0 ? max : 1
+															max
 														);
 													}}
 												>
@@ -245,22 +255,19 @@ const Market = ({
 														shares
 													)
 												}
-												disabled={info.totalCost > cash}
+												disabled={!shares || info.totalCost > cash}
 											>
 												Buy
 											</Button>
 											<Button
 												className="flex-1"
-												variant="outline"
 												onClick={() =>
 													onSell(
 														selectedCompany,
 														shares
 													)
 												}
-												disabled={
-													shares > info.sharesOwned
-												}
+												disabled={!shares || shares > info.sharesOwned}
 											>
 												Sell
 											</Button>
